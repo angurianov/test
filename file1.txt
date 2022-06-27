@@ -1,1 +1,2 @@
 HelloWorld
+NewAddedLine2 to file1
