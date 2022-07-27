@@ -1,0 +1,75 @@
+apiVersion : apps/v1
+kind: Deployment                # описываем deployment
+metadata:
+  name: web-deploy
+spec:
+  selector:
+    matchLabels:
+      project: test2            # Deployment будет запущен с POD`ом, содержащим метку "test2"
+  template:                     # блок ниже описывает POD
+    metadata:
+      labels:
+        project: test2          # имя (метка) POD`а, к которому привязан deployment
+    spec:
+      containers:
+        - name: deploy-apache-web-server
+          image: httpd          # в качестве тестового веб-приложения выбран apache (httpd)
+          ports:
+            - containerPort: 80 # запустить контейнер на 80 порту
+          resources:
+            requests:           # ресурсы, затребованные под наш POD
+              memory: "128M"    # 128 Мбайт памяти
+              cpu: "100m"       # 0.1 CPU
+            limits:             # максимально допустимые ресурсы, выделяемые для POD
+              memory: "256M"    # памяти в 2 раза больше, для обеспечения максимальной отказоустойчивости, на случай пикового превышения в 128М; хоть потребление и всегда ровное в 128М
+              cpu: "1000m"      # 1 CPU (десятикратный запас) для максимальной отказоустойчивости во время пиковых превышений в 0.1 CPU
+          startupProbe:         # тест готовности приложения после развёртывания
+            tcpSocket:          # тестируем с помощью подключения к 80-му порту TCP (можно так же сделать тест через HTTP request)
+              port: 80
+            failureThreshold: 3 # максимальное количество неудачных тестов = 3
+            periodSeconds: 5    # тест делать раз в 5 секунд; то есть если приложение не запустится через 15 секунд (3*5), то контейнер будет перезапущен
+          livenessProbe:        # тест на доступность приложения в процессе его работы, для обеспечения максимальной отказоустойчивости
+            tcpSocket:          # тест через подключение к 80 порту по TCP
+              port: 80
+            initialDelaySeconds: 15 # ждать 15 секунд после развертывания, прежде чем начать делать первый тест
+            periodSeconds: 20   # делать тест раз в 20 секунд
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler   # описываем автомасштабирование HPA
+metadata:
+  name: web-deploy-autoscaling
+spec:
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: web-deployment-autoscaling
+    minReplicas: 2              # минимальное количество POD=2; из предположения, что ночью нагрузка минимальная и хватает только одного пода, для резервирования делаем n+1, то есть 2 пода
+    maxReplicas: 5              # максимальное количество POD=5; для резервирования во время пиковых нагрузок (4+1 / n+1); а так же с учетом, что в наличии есть 5 нод
+    metrics:                    # в качестве критерия масштабирования количества подов можно использовать разные метрики
+    - type: Object              # в этом случае используется метрика "количество запросов к приложению в секунду", и значение 1000
+      object:                   # при превышении порога в 1к запросов произойдет увеличение количества подов на 1 (при превышении 2к - на 2, и т.д., вплоть до 5 подов)
+        metric:                 # для использования подобных метрик требуется сервер метрик, например Prometheus. Данный пример взят из документации k8s
+          name: requests-per-second
+        describedObject:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          name: main-route
+        target:
+          type: Value
+          value: 1k
+
+---
+apiVersion: v1
+kind: Service                   # описываем сервис, для подключения к приложению
+metadata:
+  name: service-for-web-deploy
+spec:
+  type: LoadBalancer            # тип LoadBalancer для выделения External IP
+  selector:
+    project: test2              # привязка к POD с именем (меткой) test2
+  ports:
+    - name      : web-app-listener
+      protocol  : TCP
+      port      : 80            # порт "снаружи" 80
+      targetPort: 80            # порт, к которому будет обращение внутри контейнера: 80
