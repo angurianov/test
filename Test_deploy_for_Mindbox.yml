@@ -65,11 +65,11 @@ kind: Service                   # описываем сервис, для под
 metadata:
   name: service-for-web-deploy
 spec:
-  type: LoadBalancer            # тип LoadBalancer для выделения External IP
+  type: LoadBalancer            # тип LoadBalancer для получения External IP и лёгкого доступа к приложению извне
   selector:
     project: test2              # привязка к POD с именем (меткой) test2
   ports:
     - name      : web-app-listener
       protocol  : TCP
-      port      : 80            # порт "снаружи" 80
+      port      : 80            # порт, через который доступно приложение "снаружи": 80
       targetPort: 80            # порт, к которому будет обращение внутри контейнера: 80
