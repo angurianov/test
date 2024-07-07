@@ -1,2 +1,4 @@
 [all]
-linux ansible_host=192.168.1.45
+linux ansible_host=192.168.1.45 ansible_user=test ansible_ssh_pass=123
+
+
