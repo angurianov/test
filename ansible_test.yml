@@ -7,3 +7,6 @@
       shell: echo "Hello, world!"
       retries: 100  # Number of times to retry
       delay: 60  # Interval between retries (in seconds)
+  vars:
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    
