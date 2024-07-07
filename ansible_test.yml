@@ -1,0 +1,9 @@
+---
+- name: Execute echo command every 60 seconds
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Execute echo command
+      shell: echo "Hello, world!"
+      retries: 100  # Number of times to retry
+      delay: 60  # Interval between retries (in seconds)
